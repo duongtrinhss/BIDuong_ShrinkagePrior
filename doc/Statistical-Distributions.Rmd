@@ -1,0 +1,1269 @@
+---
+title: "Statistical Distributions and Shrinkage Priors"
+author: "Duong Trinh"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    number_sections: true
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+  pdf_document: 
+    number_sections: true
+    extra_dependencies: ["mathtools","bbm"]
+runtime: shiny
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(knitr.table.format = function() {
+  if (knitr::is_latex_output()) 'latex' else 'pandoc'
+})
+options(knitr.duplicate.label = "allow")
+```
+
+<!--- For HTML Only --->
+`r if (knitr:::is_html_output()) '
+$\\newcommand{\\mathbbm}[1]{\\mathbb{#1}}$
+'`
+
+```{r, message=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+
+# Statistical Distributions
+
+## Normal Distribution
+
+The normal distribution has density:
+
+$$
+f(x) = \frac{1}{\sqrt{2\pi\sigma^{2}}} exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right)
+$$
+
+```{r, warning=FALSE}
+help("Normal")
+```
+
+Plotting the standard normal distribution
+
+```{r}
+# library(shiny)
+# library(ggplot2)
+# library(tidyverse)
+# library(miniUI)
+# 
+# 
+# myGadgetFunc <- function() {
+#   
+#   ui <- miniPage(
+#     gadgetTitleBar("My Gadget"),
+#     miniContentPanel(
+#       # Define layout, inputs, outputs
+#     sliderInput('Mean','Mean', min = - 3, max = 3, value = 0, step = 1),
+#     sliderInput('Sigma','Sigma', min = 1, max = 5, value = 1, step = 1),
+#     plotOutput('plotDensity')
+#     )
+#   )
+#   
+#   serve <- function(input, output, session) {
+#     # Define reactive expressions, outputs, etc.
+#     selectedData <- reactive({
+#     data_frame(x = c(input$Mean - 4*input$Sigma, input$Mean + 4*input$Sigma))
+#   })
+#   
+#   output$plotDensity <- renderPlot({
+#     ggplot(selectedData(), aes(x=x)) +
+#       geom_vline(xintercept = input$Mean, linetype = "dashed", alpha = 0.4) +
+#       stat_function(fun = dnorm, args = c(input$Mean,input$Sigma),
+#                     color = "#84CA72", size = 1) +
+#       ggtitle(paste0("Normal Distribution N (", input$Mean," , ", input$Sigma^2, ")")) +
+#       xlab("x") +
+#       ylab("dnorm(x)") +
+#       coord_cartesian(ylim = c(0,0.5))
+#   })
+#     # When the Done button is clicked, return a value
+#     observeEvent(input$done, {
+#       returnValue <- ...
+#       stopApp(returnValue)
+#     })
+#     
+#   }
+#   
+#   runGadget(ui,serve)
+# }
+```
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('Mu','Mu', min = - 3, max = 3, value = 0, step = 1),
+    sliderInput('Sigma','Sigma', min = 1, max = 5, value = 1, step = 1)
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+  
+  selectedData <- reactive({
+    data_frame(x = c(input$Mu - 4*input$Sigma, input$Mu + 4*input$Sigma))
+  })
+  
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = input$Mu, linetype = "dashed", alpha = 0.4) +
+      stat_function(fun = dnorm, args = c(input$Mu,input$Sigma),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("Normal Distribution N (", input$Mu," , ", input$Sigma^2, ")")) +
+      xlab("x") +
+      ylab("dnorm(x)") +
+      coord_cartesian(ylim = c(0,0.5)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+      
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+```{r, warning=FALSE, fig.align='center', results='hide', fig.show='hide'}
+mu <- 0
+sigma <- 1
+
+p <- data_frame(x = c(mu - 4*sigma, mu + 4*sigma)) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mu, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dnorm, args = c(mu,sigma),
+                  color = "#84CA72", size = 1) +
+    ggtitle(paste0("Normal Distribution N (", mu," , ", sigma^2, ")")) +
+    xlab("x") +
+    ylab("dnorm(x)") 
+```
+
+
+```{r, results='hide', fig.show='hide'}
+ggplot(data.frame(x = -5:5), aes(x)) + 
+  stat_function(fun = dnorm, args = c(0,1), geom = 'area', xlim = c(1,5), fill = 4) + 
+  stat_function(fun = dnorm, args = c(0,1)) +
+  labs(x = "", y = "")+
+  ggtitle("Normal distribution")
+```
+
+```{r}
+library("Rcpp")
+
+set.seed(123)
+rnorm(1,0,1)
+
+set.seed(123)
+evalCpp("R::rnorm(0,1)")
+
+set.seed(123)
+rnorm(3,0,1)
+
+set.seed(123)
+evalCpp("Rcpp::rnorm(3,0,1)")
+```
+
+
+```{r}
+ndraws <- 1e6
+
+ggplot(data_frame(samples = rnorm(ndraws)), aes(x = samples)) + 
+  geom_density(fill = "lightgreen") +
+  stat_function(fun = function(x) dnorm(x), color = "red")
+```
+
+
+## *t* distribution
+The *t* distribution with `df` = $\nu$ degrees of freedom has density
+
+$$
+f(x) = 
+$$
+
+```{r, warning=FALSE}
+help("TDist")
+```
+
+Plotting the Central *t* distribution
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('df','df', min = 1, max = 12, value = 6, step = 1),
+    sliderInput('ncp','ncp', min = 1, max = 5, value = 1, step = 1)
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+  
+  mean <- 0
+  sd <- reactive({sqrt(input$df/(input$df-2))})
+  selectedData <- reactive({
+    data_frame(x = c(mean - 4*sd(), mean + 4*sd()))
+  })
+  
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+      stat_function(fun = dt, args = c(input$df),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("t Distribution (df = ", input$df,")")) +
+      xlab("x") +
+      ylab(paste0("dt(x, df = ", input$df,")")) +
+      coord_cartesian(ylim = c(0,0.5)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+      
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+```{r, warning=FALSE, fig.align='center', results='hide', fig.show='hide'}
+df <- 6
+ncp <- NA # non-centrality parameter
+
+mean <- 0
+sd <- sqrt(df/(df-2))
+
+p <- data_frame(x = c(mean - 4*sd, mu + 4*sd)) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dt, args = c(df),
+                  color = "#84CA72", size = 1) +
+    labs(caption = paste0("t Distribution (df = ", df,")")) +
+    xlab("x") +
+    ylab(paste0("dt(x, df = ", df,")")) +
+    coord_cartesian(ylim = c(0,0.5)) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+```
+
+## Gamma Distribution
+
+The Gamma distribution with parameters `shape` = $\alpha$ and `scale` = $\sigma$ has density
+
+$$
+f(x \mid \alpha, \sigma) = \frac{x^{\alpha - 1} e^{(-x/\sigma)}}{\sigma^\alpha \Gamma(\alpha)} 
+$$
+for $x \geq 0, \alpha > 0$ and $\sigma > 0$.
+
+The mean and variance are
+
+$$
+E(X) = \alpha \sigma; \quad Var(X) = \alpha \sigma^2
+$$
+
+```{r, warning=FALSE}
+help("GammaDist")
+```
+
+
+Plotting the Gamma distribution
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('alpha','alpha (shape)', min = 1, max = 12, value = 1, step = 1),
+    sliderInput('sigma','sigma (scale)', min = 0, max = 3, value = 0.5, step = 0.1)
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+  
+  mean <- reactive({input$alpha*input$sigma})
+  sd <- reactive({sqrt(input$alpha*input$sigma^2)})
+
+  selectedData <- reactive({
+    data_frame(x = c(0, qgamma(p = 0.9999, shape = input$alpha, scale = input$sigma)))
+  })
+  
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = mean(), linetype = "dashed", alpha = 0.4) +
+      stat_function(fun = dgamma, args = c(input$alpha,input$sigma),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("Gamma (alpha = ", input$alpha, ", sigma = ", input$sigma,") Distribution")) +
+      xlab("x") +
+      ylab(paste0("dgamma(x, alpha = ", input$alpha, ", sigma = ", input$sigma,")")) +
+      coord_cartesian(ylim = c(0,0.5)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+      
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+```{r, warning=FALSE, fig.align='center', results='hide', fig.show='hide'}
+# dgamma(x, shape, rate = 1, scale = 1/rate, log = FALSE)
+alpha <- 1 # shape
+sigma <- 0.5 # scale
+rate <- 1/sigma # 1/scale  
+
+
+mean <- alpha*sigma
+sd <- sqrt(alpha*sigma^2)
+
+p <- data_frame(x = c(0, qgamma(p = 0.9999, shape = alpha, scale = sigma))) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dgamma, args = c(shape = alpha, scale = sigma),
+                  color = "#84CA72", size = 1) +
+    ggtitle(paste0("Gamma (alpha = ", alpha, ", sigma = ", sigma,") Distribution")) +
+    xlab("x") +
+    ylab(paste0("dgamma(x, alpha = ", alpha, ", sigma = ", sigma,")"))
+```
+
+
+```{r}
+library("Rcpp")
+
+set.seed(123)
+rgamma(3,1,1)
+
+set.seed(123)
+Rcpp::evalCpp("randg(3, arma::distr_param(1,1))", depends = "RcppArmadillo")
+
+vecgamma <- cppFunction(depends = "RcppArmadillo",
+                  '
+  arma::vec C() {
+    return randg(3, arma::distr_param(1,1));
+  }
+'
+)
+set.seed(123)
+vecgamma()
+```
+
+## Inverse-Gamma Distribution
+The Inverse-Gamma distribution with parameters `shape` = $\alpha$ and `scale` = $\beta$ has density
+
+$$
+f(x \mid \alpha, \beta) = \frac{\beta^\alpha x^{-\alpha-1} exp(-\beta/x)}{\Gamma(\alpha)} 
+$$
+for $x \geq 0, \alpha > 0$ and $\beta > 0$.
+
+The mean and variance are
+
+$$
+E(X) = \frac{\beta}{\alpha-1} \quad (\alpha>1) ; \quad Var(X) = \frac{\beta^2}{(\alpha-1)^2(\alpha-2)} \quad (\alpha>2)
+$$
+
+Plotting the Inverse-Gamma distribution
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('alpha','alpha (shape)', min = 1, max = 12, value = 1, step = 1),
+    sliderInput('beta','beta (scale)', min = 0, max = 3, value = 0.5, step = 0.5)
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+  
+  mode <- reactive({input$beta/(input$alpha+1)})
+
+  selectedData <- reactive({
+    data_frame(x = c(0, qinvgamma(p = 0.9, shape = input$alpha, scale = input$beta)))
+  })
+  
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = mode(), linetype = "dashed", alpha = 0.4, color = "blue") +
+      stat_function(fun = dinvgamma, args = c(input$alpha,input$beta),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("Inverse Gamma (alpha = ", input$alpha, ", beta = ", input$beta,") Distribution")) +
+      xlab("x") +
+      ylab(paste0("dinvgamma(x, alpha = ", input$alpha, ", beta = ", input$beta,")")) +
+      coord_cartesian(xlim = c(0,3)) +
+      coord_cartesian(ylim = c(0,5)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+      
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+```{r, warning=FALSE}
+alpha <- 1 # shape
+beta <- 1 # scale
+
+# install.packages("invgamma")
+# library(LaplacesDemon)
+# library(MCMCpack)
+library(invgamma)
+q9999 <- qinvgamma(p = 0.9999, shape = alpha, scale = beta)
+p <- data_frame(x = c(0, q9999)) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dinvgamma, args = c(shape = alpha, scale = beta),
+                  color = "#84CA72", size = 1) +
+    ggtitle(paste0("Inverse Gamma (alpha = ", alpha, ", beta = ", beta,") Distribution")) +
+    xlab("x") +
+    ylab(paste0("dinvgamma (x, alpha = ", alpha, ", beta = ", beta,")"))
+```
+
+```{r}
+ndraws <- 1e6
+
+# rinvgamma(ndraws, shape = alpha, scale = beta)
+alpha <- 1 # shape
+beta <- 1 # scale
+
+g1 <- rgamma(ndraws, shape = alpha, scale = 1/beta)
+g2 <- 1/g1
+
+data_frame(g1=g1,g2=g2) %>% summarise_each(funs(mean, min,  max, sd))
+
+plotg1 <- ggplot(data_frame(g1), aes(x=g1)) + 
+  # geom_density(fill = "lightgreen") +
+  stat_function(fun = function(x) dgamma(x, shape = alpha, scale = 1/beta), color = "red")
+
+plotg2 <- ggplot(data_frame(g2), aes(x=g2)) + 
+  # geom_density(fill = "green") +
+  stat_function(fun = function(x) dinvgamma(x, shape = alpha, scale = beta), color = "red") +
+  xlim(0,10)
+
+plotg3 <- ggplot(data_frame(g3 = rgamma(ndraws, shape = alpha, scale = 1/beta)), aes(x=g3)) + 
+  # geom_density(fill = "lightgreen") +
+  stat_function(fun = function(x) dgamma(x, shape = alpha, scale = 1/beta), color = "red")
+
+plotg4 <- ggplot(data_frame(g4 = rinvgamma(ndraws, shape = alpha, scale = beta)), aes(x=g4)) + 
+  # geom_density(fill = "green") +
+  stat_function(fun = function(x) dinvgamma(x, shape = alpha, scale = beta), color = "red") +
+  xlim(0,10)
+
+
+library(gridExtra)
+grid.arrange(plotg1,plotg2, ncol = 2)
+grid.arrange(plotg3,plotg4, ncol = 2)
+```
+
+
+## Exponential Distribution
+The exponential distribution with parameter `rate` = $\lambda$ has density
+
+$$
+f(x \mid \lambda) = \lambda e^{-\lambda x}
+$$
+
+for $x \geq 0$.
+
+The mean and variance are
+
+$$
+E(X) = \frac{1}{\lambda}; \quad Var(X) = \frac{1}{\lambda^2}
+$$
+
+Plotting the Exponential distribution
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('lambda','lambda (rate)', min = 0.5, max = 2, value = 1, step = 0.5),
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+  
+  mean <- reactive({1/input$lambda})
+  sd <- reactive({1/input$lambda})
+
+  selectedData <- reactive({
+    data_frame(x = c(0, qexp(p = 0.9999, rate = input$lambda)))
+  })
+  
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = mean(), linetype = "dashed", alpha = 0.4) +
+      stat_function(fun = dexp, args = c(input$lambda),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("Exponential (lambda = ", input$lambda,") Distribution")) +
+      xlab("x") +
+      ylab(paste0("dexp(x, lambda = ", input$lambda,")")) +
+      coord_cartesian(ylim = c(0,2)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      ) 
+      
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+```{r, warning=FALSE, fig.align='center', results='hide', fig.show='hide'}
+# dexp(x, rate = 1, log = FALSE)
+lambda <- 1 # rate
+
+mean <- 1/lambda
+sd <- 1/lambda
+
+p <- data_frame(x = c(0, qexp(p = 0.9999, rate = lambda))) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dexp, args = c(rate = lambda),
+                  color = "#84CA72", size = 1) +
+    ggtitle(paste0("Exponential (lambda = ", lambda,") Distribution")) +
+    xlab("x") +
+    ylab(paste0("dexp(x, lambda = ", lambda,")")) +
+    coord_cartesian(ylim = c(0,1.5))
+```
+
+## Laplace Distribution
+
+The Laplace distribution with parameters `location` = $\mu$ and `scale` = $\lambda$ has density
+
+$$
+f(x \mid \mu, \lambda) = \frac{1}{2\lambda} exp\left(-\frac{\mid x - \mu \mid}{\lambda}\right)
+$$
+
+The mean and variance are
+
+$$
+E(X) = \mu; \quad Var(X) = 2 \lambda^2
+$$
+```{r, warning=FALSE, results='hide'}
+library(rmutil) # for double-exponential 
+library(LaplacesDemon)
+```
+
+Plotting the $Laplace(\mu, \lambda)$ distribution
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+# library(rmutil) # for double-exponential 
+# library(LaplacesDemon)
+
+ui <- fluidPage(
+  column(4,
+    wellPanel(
+    sliderInput('mu','mu (location)', min = -3, max = 3, value = 0, step = 1),
+    sliderInput('lambda','lambda (scale)', min = 0, max = 10, value = 1, step = 1)
+    )
+  ),
+  column(8,
+    plotOutput('plotDensity')
+  )
+)
+
+server <- function(input,output) {
+
+  mean <- reactive({input$mu})
+  sd <- reactive({sqrt(2*input$lambda^2)})
+  q9999 <- reactive({qlaplace(p = 0.9999, location = input$mu, scale = input$lambda)})
+
+  selectedData <- reactive({
+    data_frame(x = c(c(-q9999(),q9999())))
+  })
+
+  output$plotDensity <- renderPlot({
+    ggplot(selectedData(), aes(x=x)) +
+      geom_vline(xintercept = mean(), linetype = "dashed", alpha = 0.4) +
+      stat_function(fun = dlaplace, args = c(location = input$mu, scale = input$lambda),
+                    color = "#84CA72", size = 1) +
+      labs(caption = paste0("Laplace (mu = ", input$mu, ", lambda = ", input$lambda,") Distribution")) +
+      xlab("x") +
+      ylab(paste0("dgamma(x, Laplace (mu = ", input$mu, ", lambda = ", input$lambda,")")) +
+      coord_cartesian(ylim = c(0,0.5)) +
+      theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+
+  })
+
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+```{r, warning=FALSE, fig.align='center', results='hide', fig.show='hide'}
+# dlaplace(x, location=0, scale=1, log=FALSE)
+mu <- 0 # location
+lambda <- 1/0.1 # scale
+
+mean <- mu
+sd <- sqrt(2*lambda^2)
+q9999 <- qlaplace(p = 0.9999, location = mu, scale = lambda)
+
+p <- data_frame(x = c(-q9999,q9999)) %>% 
+  ggplot(aes(x=x))
+
+p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+    stat_function(fun = dlaplace, args = c(location = mu, scale = lambda),
+                  color = "#84CA72", size = 1) +
+    ggtitle(paste0("Laplace (mu = ", mu, ", lambda = ", lambda,") Distribution")) +
+    xlab("x") +
+    ylab(paste0("dlaplace(x, Laplace (mu = ", mu, ", lambda = ", lambda,")"))
+```
+
+
+```{r, warning=FALSE, fig.align='center'}
+# rlaplace(n, location=0, scale=1, log=FALSE)
+set.seed(1107)
+n = 10000
+
+mu <- 0 # location
+lambda1 <- 1/0.1 # scale
+ilambda1 <- 1/lambda1 # rate
+
+tausq1 <-  rexp(n, rate = ilambda1^2/2)
+mean(tausq1)
+
+
+library(tictoc)
+tic()
+x1 <- rep(NA,n)
+for (i in 1:n) {
+  x1[i] <- rnorm(1, mean = mu, sd = sqrt(tausq1[i]))
+}
+toc()
+c(mean(x1),sd(x1))
+
+
+library(purrr)
+tic()
+x1 <- map_dbl(tausq1, ~ rnorm(1, mu, sd = sqrt(.x)))
+toc()
+c(mean(x1),sd(x1))
+
+
+ilambda0 <- rgamma(n, shape = 1, rate = 0.00001)
+c(mean(ilambda0),sd(ilambda0))
+
+tausq0 <- rep(NA,n)
+x0 <- rep(NA,n)
+for (i in 1:n) {
+  tausq0[i] <-  rexp(1, rate = ilambda0[i]^2/2)
+  x0[i] <- rnorm(1, mean = mu, sd = sqrt(tausq0[i]))
+}
+
+mean(tausq0)
+c(mean(x0), sd(x0))
+
+
+p <- ggplot(data_frame(x1), aes(x=x1)) 
+p + geom_density(color = 'red') +
+  coord_cartesian(xlim = c(-100,100))
+
+p <- ggplot(data_frame(x0), aes(x=x0)) 
+p + geom_density(color = 'blue') +
+  coord_cartesian(xlim = c(-0.05,0.05))
+
+
+gamma <- rbinom(n, 1, prob = 0.5)
+x <- gamma*x1 + (1-gamma)*x0
+c(mean(x),sd(x))
+
+p <- ggplot(data_frame(x), aes(x=x)) 
+p + geom_density(color = 'green') 
+```
+
+
+```{r, warning=FALSE, fig.align='center'}
+# rlaplace(n, location=0, scale=1, log=FALSE)
+set.seed(1107)
+n = 10000
+
+ilambda <- rgamma(n, shape = 1, rate = 1)
+mean(ilambda)
+sd(ilambda)
+
+tausq <-  rexp(n, rate = ilambda^2/2)
+x <- rnorm(n, mean = mu, sd = sqrt(tausq))
+mean(tausq)
+sd(x)
+mean(x)
+
+p <- ggplot(data_frame(x), aes(x=x)) 
+p + geom_density(color = 'green') 
+```
+
+# Bayesian Shrinkage Priors
+## `CTS-studt`
+
+```{r, warning=FALSE, fig.align='center'}
+
+# Student-t distribution ====
+
+# df <- 6
+# ncp <- NA # non-centrality parameter
+# 
+# mean <- 0
+# sd <- sqrt(df/(df-2))
+# 
+# p <- data_frame(x = c(mean - 4*sd, mean + 4*sd)) %>%
+#   ggplot(aes(x=x))
+# 
+# p + geom_vline(xintercept = mean, linetype = "dashed", alpha = 0.4) +
+#     stat_function(fun = dt, args = c(df),
+#                   color = "#84CA72", size = 1) +
+#     labs(caption = paste0("t Distribution (df = ", df,")")) +
+#     xlab("x") +
+#     ylab(paste0("dt(x, df = ", df,")")) +
+#     coord_cartesian(ylim = c(0,0.5)) +
+#     theme(
+#         plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+#       )
+
+dt2 <- function(df) {
+  function (x) dt(x, df = df)
+}
+
+stat_studt <- function(df) {
+  stat_function(aes(colour = df), fun = dt2(df), size = 0.5)
+}
+
+ggplot(data_frame(x = c(-5,5)), aes(x)) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.4) +
+  lapply(c(2,4,6), stat_studt) +
+  scale_colour_viridis_c(limits = c(2,6)) +
+    labs(caption = paste0("t Distribution (df)")) +
+    xlab("x") +
+    ylab(paste0("dt(x, df)")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+
+# CTS-studt prior ====
+ndraws <- 1e5
+
+alpha <- 1
+beta <- 0.001
+tausq <- 1/rgamma(ndraws, shape = alpha, scale = 1/beta)
+library(purrr)
+x <- map_dbl(tausq, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+
+
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(color = "red", fill = "lightgreen") +
+  xlim(-10,10) + coord_cartesian(c(-5,5))+
+    labs(caption = paste0("CTS-studt prior (alpha = ", alpha, ", beta = ", beta, ")")) +
+    xlab("x") +
+    ylab(paste0("density")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+
+# ggplot(data_frame(x), aes(x=x)) +
+#   stat_density(geom = "line", position = "identity") +
+#   xlim(-10,10) + coord_cartesian(c(-5,5))
+
+# Choose hyper-parameters
+library(purrr)
+ndraws <- 1e5
+
+CTS_studt_pa1 <- function(alpha){
+  set.seed(123)
+  ndraws <- 1e5
+  beta <- 0.001
+  tausq <- 1/rgamma(ndraws, shape = alpha, scale = 1/beta)
+  x <- map_dbl(tausq, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+
+df1_pa1 <- lapply(c(1,2,3), CTS_studt_pa1)
+df2_pa1 <- data_frame(x = unlist(df1_pa1), alpha = factor(rep(c(1,2,3), each = ndraws)))
+
+plot_pa1 <- ggplot(df2_pa1, aes(x=x, color = alpha)) +
+  geom_density() +
+  xlim(-10,10) + coord_cartesian(c(-5,5))
+
+tail_pa1 <- ggplot(df2_pa1, aes(x=x, color = alpha)) +
+  geom_line(aes(y = 1 - ..y.., linetype = alpha), stat='ecdf') +
+  scale_linetype_manual(values = c(1, 2, 3)) +
+  coord_cartesian(xlim = c(0, 1.5), ylim = c(0, 0.5), expand = FALSE) +
+  theme(axis.title = element_blank(), legend.position = "bottom") + 
+  guides(lty=guide_legend(nrow=1,byrow=TRUE))
+
+CTS_studt_pa2 <- function(beta){
+  set.seed(123)
+  ndraws <- 1e5
+  alpha <- 1
+  tausq <- 1/rgamma(ndraws, shape = alpha, scale = 1/beta)
+  x <- map_dbl(tausq, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+
+df1_pa2 <- lapply(c(0.001,0.01,0.1), CTS_studt_pa2)
+df2_pa2 <- data_frame(x = unlist(df1_pa2), beta = factor(rep(c(0.001,0.01,0.1), each = ndraws)))
+
+plot_pa2 <- ggplot(df2_pa2, aes(x=x, color = beta)) +
+  geom_density() +
+  xlim(-10,10) + coord_cartesian(c(-5,5))
+
+tail_pa2 <- ggplot(df2_pa2, aes(x=x, color = beta)) +
+  geom_line(aes(y = 1 - ..y.., linetype = beta), stat='ecdf') +
+  scale_linetype_manual(values = c(1, 2, 3)) +
+  coord_cartesian(xlim = c(0, 1.5), ylim = c(0, 0.5), expand = FALSE) +
+  theme(axis.title = element_blank(), legend.position = "bottom") + 
+  guides(lty=guide_legend(nrow=1,byrow=TRUE))
+
+# xlim removes values outside the range, coord_cartesian does not, but behaves strange sometimes
+# solution: restrict range with xlim first & then use coord-cartesian  
+# percentage of obs removed
+sum((df2_pa2$x < 10) & (df2_pa2$x > -10))/length(df2_pa2$x)*100
+
+
+library(gridExtra)
+grid.arrange(plot_pa1,plot_pa2, ncol = 2)
+# tail behavior
+grid.arrange(tail_pa1,tail_pa2, ncol = 2)
+```
+
+## `CTS-lasso`
+
+```{r, warning=FALSE, fig.align='center'}
+# Laplace distribution ====
+library(LaplacesDemon)
+
+# rlaplace(n, location=0, scale=1, log=FALSE)
+
+# mu <- 0 # location
+# lambda <- 1/0.1 # scale
+# 
+# x <- rlaplace(n = 1e5, location = mu, scale = lambda)
+# 
+# ggplot(data_frame(x), aes(x=x)) +
+#   geom_density(fill = "lightgreen") +
+#   stat_function(fun = dlaplace, args = c(location = mu, scale = lambda),
+#                   color = "red", size = 1) 
+
+
+
+dlaplace2 <- function(scale) {
+  function (x) dlaplace(x, location = 0, scale = scale)
+}
+
+stat_laplace <- function(scale) {
+  stat_function(aes(colour = scale), 
+                fun = dlaplace2(scale = scale), 
+                size = 0.5) 
+}
+
+ggplot(data_frame(x = c(-5,5)), aes(x=x)) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.4) +
+  lapply(c(1,5,10), stat_laplace) +
+  scale_colour_viridis_c(limits = c(1,10)) +
+    labs(caption = paste0("Laplace Distribution (scale)")) +
+    xlab("x") +
+    ylab(paste0("dlapalce(x, scale)")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+
+
+# CTS-lasso prior ====
+
+# Double exponential
+ndraws <- 1e5
+mu <- 0 # location
+scale <- 1/1 # scale
+lambdasq <- 1/scale # rate
+
+tausq <-  rexp(ndraws, rate = lambdasq/2)
+library(purrr)
+x <- map_dbl(tausq, ~ rnorm(1, mean = mu, sd = sqrt(.x)))
+
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(fill = "lightgreen") +
+  stat_function(fun = dlaplace, args = c(location = mu, scale = scale),
+                  color = "red", size = 1)
+
+# Hierarchical 
+ndraws <- 1e5
+
+library(purrr)
+alpha <- 1
+sigma <- 1
+
+lambdasq <- rgamma(ndraws, shape = alpha, scale = sigma)
+tausq <-  map_dbl(lambdasq, ~rexp(1, rate = .x/2))
+x <- map_dbl(tausq, ~ rnorm(1, mean = 0, sd = sqrt(.x)))
+
+# c(mean(lambdasq), sd(lambdasq))
+scale <- 1/sqrt(mean(lambdasq)) # for corresponding Laplace distribution
+
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(fill = "lightgreen") +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.4) +
+  stat_function(fun = dlaplace, args = c(location = 0, scale = scale),
+                  color = "red", size = 0.5) +
+  xlim(-10,10) + coord_cartesian(c(-5,5)) +
+  labs(caption = paste0("CTS-lasso prior (alpha = ", alpha, ", sigma = ", sigma, ")")) +
+  xlab("x") +
+  ylab(paste0("density")) +
+  theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+  )
+
+
+# Choose hyper-parameters
+library(purrr)
+ndraws <- 1e5
+
+CTS_lasso_pa1 <- function(alpha) {
+  set.seed(123)
+  sigma = 1
+  lambdasq <- rgamma(ndraws, shape = alpha, scale = sigma)
+  tausq <-  map_dbl(lambdasq, ~rexp(1, rate = .x/2))
+  x <- map_dbl(tausq, ~ rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+
+df1_pa1 <- lapply(c(1,2,3), CTS_lasso_pa1)
+df2_pa1 <- data_frame(x = unlist(df1_pa1), alpha = factor(rep(c(1,2,3), each = ndraws)))
+
+plot_pa1 <- ggplot(df2_pa1, aes(x=x, color = alpha)) +
+  geom_density() +
+  xlim(-10,10) + coord_cartesian(c(-5,5))
+
+tail_pa1 <- ggplot(df2_pa1, aes(x=x, color = alpha)) +
+  geom_line(aes(y = 1 - ..y.., linetype = alpha), stat='ecdf') +
+  scale_linetype_manual(values = c(1, 2, 3)) +
+  coord_cartesian(xlim = c(0, 2), ylim = c(0, 0.5), expand = FALSE) +
+  theme(axis.title = element_blank(), legend.position = "bottom") + 
+  guides(lty=guide_legend(nrow=1,byrow=TRUE))
+
+CTS_lasso_pa2 <- function(sigma) {
+  set.seed(123)
+  alpha = 1
+  lambdasq <- rgamma(ndraws, shape = alpha, scale = sigma)
+  tausq <-  map_dbl(lambdasq, ~rexp(1, rate = .x/2))
+  x <- map_dbl(tausq, ~ rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+
+df1_pa2 <- lapply(c(1,2,3), CTS_lasso_pa2)
+df2_pa2 <- data_frame(x = unlist(df1_pa2), sigma = factor(rep(c(1,2,3), each = ndraws)))
+
+plot_pa2 <- ggplot(df2_pa2, aes(x=x, color = sigma)) +
+  geom_density() +
+  xlim(-10,10) + coord_cartesian(c(-5,5))
+
+tail_pa2 <- ggplot(df2_pa2, aes(x=x, color = sigma)) +
+  geom_line(aes(y = 1 - ..y.., linetype = sigma), stat='ecdf') +
+  scale_linetype_manual(values = c(1, 2, 3)) +
+  coord_cartesian(xlim = c(0, 2), ylim = c(0, 0.5), expand = FALSE) +
+  theme(axis.title = element_blank(), legend.position = "bottom") + 
+  guides(lty=guide_legend(nrow=1,byrow=TRUE))
+
+# xlim removes values outside the range, coord_cartesian does not, but behaves strange sometimes
+# solution: restrict range with xlim first & then use coord-cartesian  
+# percentage of obs removed
+# sum((df2_pa1$x < 10) & (df2_pa1$x > -10))/length(df2_pa1$x)*100
+# sum((df2_pa2$x < 10) & (df2_pa2$x > -10))/length(df2_pa2$x)*100
+
+library(gridExtra)
+grid.arrange(plot_pa1,plot_pa2, ncol = 2)
+# tail behavior
+grid.arrange(tail_pa1,tail_pa2, ncol = 2)
+```
+
+## `CTS-horse-mx`
+
+```{r}
+ndraws = 1e5
+library(purrr)
+
+nu <- 1/rgamma(ndraws, shape = 1/2, scale = 1)
+lamdasq <- map_dbl(nu, ~ 1/rgamma(1, shape = 1/2, scale = .x))
+xi <- 1/rgamma(ndraws, shape = 1/2, scale = 1)
+tausq <- map_dbl(xi, ~ 1/rgamma(1, shape = 1/2, scale = .x))
+temp <- lamdasq*tausq
+x <- map_dbl(temp, ~rnorm(1, mean = 0, sd = .x))
+
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(color = "red", fill = "lightgreen") +
+    xlim(-10,10) + coord_cartesian(c(-5,5))+
+    labs(caption = paste0("CTS-horseshoe-mx prior")) +
+    xlab("x") +
+    ylab(paste0("density")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+```
+
+
+## `CTS-horse-sl`
+
+```{r}
+ndraws = 1e5
+library(purrr)
+lambda <- rhalfcauchy(ndraws, scale= 1)
+tau <- map_dbl(lambda, ~rhalfcauchy(1, scale = .x))
+x <- map_dbl(tau, ~rnorm(1, mean = 0, sd = .x))
+
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(color = "red", fill = "lightgreen") +
+    xlim(-10,10) + coord_cartesian(c(-5,5))+
+    labs(caption = paste0("CTS-horseshoe-sl prior")) +
+    xlab("x") +
+    ylab(paste0("density")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+```
+
+
+
+## `SSVS-normal`
+
+## `SSVS-studt`
+```{r}
+ndraws <- 1e5
+
+# SSVS-studt1
+alpha1 <- 1
+beta1 <- 1
+tausq1 <- 1/rgamma(ndraws, shape = alpha1, scale = 1/beta1)
+library(purrr)
+studt_slab <- map_dbl(tausq1, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+
+tausq0 <- 1e-3
+library(purrr)
+studt_spike <- map_dbl(tausq0, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+
+
+# SSVS-studt2
+alpha1 <- 1
+beta1 <- 1
+tausq1 <- 1/rgamma(ndraws, shape = alpha1, scale = 1/beta1)
+library(purrr)
+studt_slab <- map_dbl(tausq1, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+
+tausq0 <- tausq1*1e-3
+library(purrr)
+studt_spike <- map_dbl(tausq0, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+#mean(tausq0) #0.012
+
+
+# SSVS-studt3
+alpha1 <- 1
+beta1 <- 1
+tausq1 <- 1/rgamma(ndraws, shape = alpha1, scale = 1/beta1)
+library(purrr)
+studt_slab <- map_dbl(tausq1, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+
+alpha0 <- 1
+beta0 <- 0.0001
+tausq0 <- 1/rgamma(ndraws, shape = alpha0, scale = 1/beta0)
+library(purrr)
+studt_spike <- map_dbl(tausq0, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+#mean(tausq0) #0.0035
+
+
+pi <- rbern(1e5, prob = 0.2)
+x <- pi*studt_slab + (1-pi)*studt_spike
+# tmp <- runif(1e5)
+# x <- (tmp<=0.2)*studt_slab + (tmp>0.2)*studt_spike
+ggplot(data_frame(x), aes(x=x)) +
+  geom_density(color = "red", fill = "lightgreen") +
+  xlim(-10,10) + coord_cartesian(c(-5,5))+
+    labs(caption = paste0("SSVS-studt prior")) +
+    xlab("x") +
+    ylab(paste0("density")) +
+    theme(
+        plot.caption = element_text(hjust = 0.5, size = 14, face ="italic")
+      )
+```
+
+## `SSVS-lasso`
+
+## `SSVS-horse`
+
+```{r}
+##### Sample from prior densities -----
+
+set.seed(123)
+ndraws <- 1e5
+
+## ridge 
+normal <- rnorm(ndraws, mean=0, sd=0.5)
+
+## Student's t 
+studt <- rt(ndraws, df=1) 
+
+CTS_studt_fun <- function(alpha = 1, beta = 0.001, ndraws = 1e5) {
+  library(purrr)
+  tausq <- 1/rgamma(ndraws, shape = alpha, scale = 1/beta)
+  x <- map_dbl(tausq, ~rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+CTS_studt <- CTS_studt_fun(alpha = 1, beta = 0.001, ndraws = 1e5)
+
+
+## lasso 
+lasso <- rmutil::rlaplace(ndraws, m=0, s=0.5)
+
+CTS_lasso_fun <- function (alpha = 1, sigma = 1, ndraws = 1e5) {
+  library(purrr)
+  lambdasq <- rgamma(ndraws, shape = alpha, scale = sigma)
+  tausq <-  map_dbl(lambdasq, ~rexp(1, rate = .x/2))
+  x <- map_dbl(tausq, ~ rnorm(1, mean = 0, sd = sqrt(.x)))
+  return(x)
+}
+CTS_lasso <- CTS_lasso_fun(alpha = 1, sigma = 1, ndraws = 1e5)
+
+## horseshoe
+
+CTS_horsemx_fun <- function(ndraws = 1e5) {
+  library(purrr)
+  nu <- 1/rgamma(ndraws, shape = 1/2, scale = 1)
+  lamdasq <- map_dbl(nu, ~ 1/rgamma(1, shape = 1/2, scale = .x))
+  xi <- 1/rgamma(ndraws, shape = 1/2, scale = 1)
+  tausq <- map_dbl(xi, ~ 1/rgamma(1, shape = 1/2, scale = .x))
+  temp <- lamdasq*tausq
+  x <- map_dbl(temp, ~rnorm(1, mean = 0, sd = .x))
+  return(x)
+}
+CTS_horsemx <- CTS_horsemx_fun(ndraws = 1e5)
+
+CTS_horsesl_fun <- function(ndraws = 1e5) {
+  library(purrr)
+  lambda <- rhalfcauchy(ndraws, scale= 1)
+  tau <- map_dbl(lambda, ~rhalfcauchy(1, scale = .x))
+  x <- map_dbl(tau, ~rnorm(1, mean = 0, sd = .x))
+  return(x)
+}
+CTS_horsesl <- CTS_horsesl_fun(ndraws = 1e5)
+```
+
+
+```{r}
+##### Plot -----
+## Create plot data
+df_comb <- data_frame(CTS_studt, CTS_lasso, CTS_horsemx, CTS_horsesl)
+df_long <- gather(df_comb, Prior, value) # long format
+df_long$Prior <- factor(df_long$Prior)
+levels(df_long$Prior) <- list("CTS_studt" = "CTS_studt", "CTS_lasso" = "CTS_lasso", "CTS_horsemx" = "CTS_horsemx", "CTS_horsesl" = "CTS_horsesl")
+df_long$asymp <- rep(NA, nrow(df_long)) 
+df_long[which(df_long$Prior=="CTS_horsemx"|df_long$Prior=="CTS_horsesl"), "asymp"] <- 0
+
+   
+df_long <- gather(df_comb, Prior, value) %>% 
+      mutate(Prior = factor(Prior, levels = list("CTS_studt" = "CTS_studt", "CTS_lasso" = "CTS_lasso", "CTS_horsemx" = "CTS_horsemx", "CTS_horsesl" = "CTS_horsesl")),
+             asymp = case_when(Prior=="CTS_horsemx" ~ 0,
+                               Prior=="CTS_horsesl" ~ 0,
+                               TRUE ~ NA_real_))
+
+plotComb <- ggplot(df_long, aes(x = value, colour = Prior, linetype = Prior)) +
+  stat_density(geom = "line", position = "identity") +
+  geom_vline(aes(xintercept = asymp), colour = "grey") +
+  scale_linetype_manual(values = c(1,2,3,4)) +
+  scale_color_manual(values = c(1,2,3,4)) +
+  xlim(-10,10) + coord_cartesian(xlim=c(-5,5), ylim =c(0,5)) +
+  theme(axis.title = element_blank(), legend.position = "bottom")
+# xlim removes values outside the range, coord_cartesian does not, but behaves strange sometimes
+# solution: restrict range with xlim first & then use coord-cartesian  
+
+##### Tail behavior -----
+# Plot the survival function, i.e., 1-CDF
+# See https://stats.stackexchange.com/questions/86429/which-has-the-heavier-tail-lognormal-or-gamma
+
+tailComb <- ggplot(df_long, aes(x = value, group = Prior)) +
+  geom_line(aes(y = 1 - ..y.., linetype = Prior, colour = Prior), stat='ecdf') +
+  scale_linetype_manual(values = c(1,2,3,4)) +
+  scale_color_manual(values = c(1,2,3,4)) +
+  coord_cartesian(xlim = c(0, 8), ylim = c(0, 0.5), expand = FALSE) +
+  theme(axis.title = element_blank(), legend.position = "bottom", legend.title = element_blank()) + 
+  guides(lty=guide_legend(nrow=1,byrow=TRUE))
+
+library(gridExtra)
+get_legend <- function(myggplot){
+  require(gridExtra)
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+}
+
+legend <- get_legend(plotComb)
+plotComb <- plotComb + theme(legend.position="none")
+tailComb <- tailComb + theme(legend.position="none")
+grid.arrange(plotComb,tailComb, legend, ncol = 2, nrow =2,
+             layout_matrix = rbind(c(1,2),c(3,3)),
+             heights = c(4,1))
+```
+
+
+
+
+
+

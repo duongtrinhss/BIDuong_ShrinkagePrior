@@ -1,0 +1,412 @@
+---
+title: "Bayesian-Linear-Regression-with-Shrinkage-Priors-MCnote"
+author: "Duong Trinh"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    number_sections: true
+    extra_dependencies: ["mathtools","bbm","float"]
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: hide
+bibliography: refs.bib
+fontsize: 10pt
+---
+
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(knitr.table.format = function() {
+  if (knitr::is_latex_output()) 'latex' else 'pandoc'
+})
+#tinytex::reinstall_tinytex(repository = "tlmgr")
+```
+
+<!--- For HTML Only --->
+`r if (knitr:::is_html_output()) '
+$\\newcommand{\\mathbbm}[1]{\\mathbb{#1}}$
+'`
+\raggedright
+
+# About 2022.05.05_MonteCarlo (KST)
+
+## Result - 2022.06.27
+
++ Function to generate various regression models: `GenRegr_sep2021.m`
+
++ Monte Carlo exercise: `MC_main_2706.m` - there are 8 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGP (7) – Heteroskedastic errors,
+  + DGP (8) – Stochastic Volatility.
+  + DGPs (1 + 3 + 5) correspond to Rsquared = 0.4; DGPs (2 + 4 + 6) correspond to Rsquared = 0.8.
+  
++ Summary: 
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+library(R.matlab)
+library(kableExtra)
+DGPmat2706 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2706/DGPmat2706.mat")
+DGPmat2706 <- as.data.frame(DGPmat2706)[, c(1:7,9)]
+names(DGPmat2706) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_1 <- DGPmat2706[1:6,]
+rownames(beta_mat_1) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 50$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_2 <- DGPmat2706[7:12,]
+rownames(beta_mat_2) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 100$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_3 <- DGPmat2706[13:18,]
+rownames(beta_mat_3) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 150$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+epsilon_mat <- DGPmat2706[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150") 
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+SNR_mat <- DGPmat2706[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+Rsquared_mat <- DGPmat2706[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+
++ Results:
+  + https://duongtrinh.shinyapps.io/kst-ana1/
+  + https://duongtrinh.shinyapps.io/kst-ana2/
+
++ Issues:
+  + Inconsistent Signal to Noise ratio (or R-squared) $\rightarrow$ Change functions to be used for DGPs.
+  + *SSVS-Lasso-3* and *SSVS-Horseshoe-2* perform considerably worse than other Bayesian shrinkage priors, and even worse than No shrinkage sometimes (seem to induce too much shrinkage effect):
+    + *SSVS-Lasso-3*: "kappa0 = NaN" in `BayesRegr.m` so that "tau0 = 1e-10" always!
+    + *SSVS-Horseshoe-2*: The condition "tau1(tau1<1e-20) = 1e-20" and "tau0 = 1e-3*tau1" is the cause...
+
+\raggedright
+
+## Result - 2022.07.14
+
++ Function to generate various regression models: `GenRegr_july2022.m`
+
++ Monte Carlo exercise: `MC_main_1007.m` - there are 10 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGPs (7 + 8) – Heteroskedastic errors,
+  + DGPs (9 + 10) – Stochastic Volatility.
+  + Odd DGPs (1 + 3 + 5 + 7 + 9) correspond to Rsquared = 0.4; Even DGPs (2 + 4 + 6 + 8 +20) correspond to Rsquared = 0.8.
+  
++ Summary: 
+
+```{r, message=FALSE, echo=FALSE}
+library(R.matlab)
+DGPmat1407 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2307/DGPmat1407.mat")
+DGPmat1407 <- as.data.frame(DGPmat1407)
+names(DGPmat1407) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8", "DGP9", "DGP10")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_1 <- DGPmat1407[1:6,]
+rownames(beta_mat_1) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 50$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_2 <- DGPmat1407[7:12,]
+rownames(beta_mat_2) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 100$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_3 <- DGPmat2706[13:18,]
+rownames(beta_mat_3) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 150$")
+```
+
+```{r, message=FALSE, echo=FALSE}
+epsilon_mat <- DGPmat1407[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+SNR_mat <- DGPmat1407[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+Rsquared_mat <- DGPmat1407[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared") %>% kable_styling(latex_options = "HOLD_position")
+```
+
++ Results:
+  + https://duongtrinh.shinyapps.io/KST-ana5/
+  + https://duongtrinh.shinyapps.io/KST-ana6/
+  
++ Issues: While our goal is inference in coefficients, true $\beta$ varies across DGPs.
+
+\raggedright
+
+## Result - 2022.07.27
+
++ Function to generate various regression models: `GenRegr_27072022.m`
+
++ Monte Carlo exercise: `MC_main_1007.m` - there are 10 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGPs (7 + 8) – Heteroskedastic errors,
+  + DGPs (9 + 10) – Stochastic Volatility.
+  + Odd DGPs (1 + 3 + 5 + 7 + 9) correspond to Rsquared = 0.4; Even DGPs (2 + 4 + 6 + 8 +20) correspond to Rsquared = 0.8.
+
++ Summary: 
+```{r, message=FALSE, echo=FALSE}
+library(R.matlab)
+DGPmat2707 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2307/DGPmat2707.mat")
+DGPmat2707 <- as.data.frame(DGPmat2707)
+names(DGPmat2707) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8", "DGP9", "DGP10")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_1 <- DGPmat2707[1:6,]
+rownames(beta_mat_1) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 50$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_2 <- DGPmat2707[7:12,]
+rownames(beta_mat_2) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 100$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+beta_mat_3 <- DGPmat2707[13:18,]
+rownames(beta_mat_3) <- c("b1", "b2", "b3", "b4", "b5", "b6")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "BetaTrue: $n = 100$, $p = 150$") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+epsilon_mat <- DGPmat2707[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+SNR_mat <- DGPmat2707[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, message=FALSE, echo=FALSE}
+Rsquared_mat <- DGPmat2707[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared") %>% kable_styling(latex_options = "HOLD_position")
+```
+
++ Results:
+  + https://duongtrinh.shinyapps.io/KST-ana7/
+  
+\raggedright
+
+## More thoughts
+
+### About the Signal-to-Noise Ratio (SNR): {-}
+
+  + Formula 1:
+
+$$
+ \frac{R^2_{pop}}{1-R^2_{pop}} = SNR = \frac{\left \| \Sigma^{1/2}\beta\right \|^2}{\sigma^2} = \frac{\beta' \Sigma \beta}{\sigma^2}
+$$
+
+
+  + Formula 2:
+
+$$
+SNR = \frac{var(X\beta)}{\sigma^2}
+$$
+
+
+  + Formula 3:
+
+$$
+SNR = \frac{\beta'X'X\beta}{(n-1)\sigma^2}
+$$
+
+```{r}
+# library(pracma) # for a (non-symmetric) Toeplitz matrix
+GenRegr <- function(n,p,options) {
+  # Generate predictors x
+  if (options.corr == 0) {# Uncorrelated predictors
+    C <-  diag(rep(1,p))
+    x <-  matrix(rnorm(n*p),n,p)%*%chol(C)
+  }
+  else if (options.corr == 1) {# Spatially ncorrelated predictors
+    C <-  toeplitz(options.rho^(0:(p-1)))
+    x <-  matrix(rnorm(n*p),n,p)%*%chol(C)
+  }
+  else {
+    print('Wrong choice of options.corr')
+  }
+  
+  x <- data.matrix(sapply(data.frame(x), function(x) {(x-mean(x))/sd(x)})) # Standardize x
+  
+  # Generate coefficients
+  beta <- rep(0,p)
+  beta[1:6] <- c(1.5,-1.5,2,-2,2.5,-2.5)
+  
+  if (options.corr == 0) {
+    signal_y <- sum(beta^2)
+  } 
+  else if (options.corr == 1) {
+    signal_y <- sum((chol(C)%*%beta)^2)
+  }
+  
+  c <- signal_y*((1-options.R2)/options.R2) # mean(sigmasq) is c to obtain desirable options.R2 (or SNR)
+  
+  # Generate epsilon
+  if (options.epsilon == 0) { # iid error
+    sigmasq <- c
+  } 
+  else if (options.epsilon == 1) {
+    temp = (x%*%beta)
+    sigmasq = c*temp/mean(temp)
+  }
+  
+  epsilon = sqrt(sigmasq) * rnorm(n)
+  
+  # Generate y
+  y = x%*%beta + epsilon
+  
+  return(list(y = y, x = x, beta = beta, C = C, sigmasq = sigmasq))
+}
+```
+
+```{r, message=FALSE}
+set.seed(2907)
+n = 100
+p = 50
+options.corr = 1
+options.R2 = 0.8 # SNR = 4
+options.epsilon = 0
+options.rho = 0.4
+
+df <- GenRegr(n, p, options)
+
+y <- df$y
+X <- df$x
+beta_true <-  df$beta
+C <- df$C
+sigmasq <- df$sigmasq
+
+# library(GGally)
+# ggcorr(X, palette = "RdBu", label = FALSE)
+# 
+# library(ggcorrplot)
+# corr <- round(cor(X), 1)
+# ggcorrplot(corr, hc.order = TRUE, outline.col = "white")
+# ggcorrplot(C, hc.order = TRUE, outline.col = "white")
+
+
+Nsim = 100
+SNR_vec1 <- rep(NA,Nsim)
+SNR_vec2 <- rep(NA,Nsim)
+SNR_vec3 <- rep(NA,Nsim)
+
+for (sim in 1 : Nsim) 
+{
+  df <- GenRegr(n, p, options)
+  set.seed(sim)
+  y <- df$y
+  X <- df$x
+  beta_true <-  df$beta
+  C <- df$C
+  SNR_vec1[sim] <-  t(beta_true)%*%C%*%beta_true/sigmasq #sum((chol(C)%*%beta_true)^2)
+  SNR_vec2[sim] <- var(X%*%beta_true)/sigmasq
+  SNR_vec3[sim] <- t(beta_true)%*%t(X)%*%X%*%beta_true/(n-1)/sigmasq
+}
+
+# SNR_vec1
+# SNR_vec2
+# SNR_vec3
+# SNR_vec2 == SNR_vec3
+# SNR_vec1
+# mean(SNR_vec2)
+
+library(tidyverse)
+df <- data.frame(sim = 1:Nsim,SNR_vec1,SNR_vec2,SNR_vec3) 
+df_long <- gather(df, formu, value, -c("sim"))
+
+ggplot(df_long, aes(x = sim, y = value, group = formu)) +
+  geom_line(aes(color = formu), size = 0.6) +
+  geom_hline(yintercept = mean(SNR_vec2), col = 4, size = 0.6) +
+  ggtitle("Signal-to-Noise Ratio over 100 simulations") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(color = "formula")
+
+  
+
+```
+
+
+\raggedright
+
+**Conclusion: ** Formula 2 and 3 are equivalent.
+
+
+**Theorem**
+
+If $\beta$ is a vector and $X$ is a random vector with mean $\mu$ and variance $\Sigma$ then
+
+$$
+\mathbbm E(\beta^TX) = \beta^T\mu \quad \text{and} \quad \mathbbm V(\beta^TX) = \beta^T\Sigma\beta 
+$$
+  
+If $B$ is a matrix then
+
+$$
+\mathbbm E(BX) = B\mu \quad \text{and} \quad \mathbbm V(BX) = B\Sigma ^TB 
+$$
+
+### Choice of priors (and hyper-parameters) {-}
+
+  + https://duongtrinh.shinyapps.io/KST-priors/

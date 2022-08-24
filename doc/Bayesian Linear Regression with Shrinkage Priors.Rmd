@@ -1,0 +1,1018 @@
+---
+title: "Bayesian Linear Regression with Shrinkage Priors"
+author: "Duong Trinh"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: hide
+  pdf_document: 
+    number_sections: true
+    extra_dependencies: ["mathtools","bbm"]
+bibliography: refs.bib
+fontsize: 10pt
+---
+
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(knitr.table.format = function() {
+  if (knitr::is_latex_output()) 'latex' else 'pandoc'
+})
+```
+
+<!--- For HTML Only --->
+`r if (knitr:::is_html_output()) '
+$\\newcommand{\\mathbbm}[1]{\\mathbb{#1}}$
+'`
+
+# About 2022.05.05_MonteCarlo (KST)
+## Result - 2022.06.27
+
++ Function to generate various regression models: `GenRegr_sep2021.m`
+
++ Monte Carlo exercise: `MC_main_2706.m` - there are 8 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGP (7) – Heteroskedastic errors,
+  + DGP (8) – Stochastic Volatility.
+  + DGPs (1 + 3 + 5) correspond to Rsquared = 0.4; DGPs (2 + 4 + 6) correspond to Rsquared = 0.8.
+  
++ Summary: 
+```{r, message=FALSE}
+library(R.matlab)
+DGPmat2706 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2706/DGPmat2706.mat")
+DGPmat2706 <- as.data.frame(DGPmat2706)[, c(1:7,9)]
+names(DGPmat2706) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8")
+beta_mat_1 <- DGPmat2706[1:6,]
+rownames(beta_mat_1) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 50")
+
+beta_mat_2 <- DGPmat2706[7:12,]
+rownames(beta_mat_2) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 100")
+
+beta_mat_3 <- DGPmat2706[13:18,]
+rownames(beta_mat_3) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 150")
+
+epsilon_mat <- DGPmat2706[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)")
+
+SNR_mat <- DGPmat2706[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR")
+
+Rsquared_mat <- DGPmat2706[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared")
+```
+
++ Results:
+  + https://duongtrinh.shinyapps.io/kst-ana1/
+  + https://duongtrinh.shinyapps.io/kst-ana2/
+
++ Issues:
+  + Inconsistent Signal to Noise ratio (or R-squared) $\rightarrow$ Change functions to be used for DGPs.
+  + *SSVS-Lasso-3* and *SSVS-Horseshoe-2* perform considerably worse than other Bayesian shrinkage priors, and even worse than No shrinkage sometimes (seem to induce too much shrinkage effect):
+    + *SSVS-Lasso-3*: "kappa0 = NaN" in `BayesRegr.m` so that "tau0 = 1e-10" always!
+    + *SSVS-Horseshoe-2*: The condition "tau1(tau1<1e-20) = 1e-20" and "tau0 = 1e-3*tau1" is the cause...
+
+
+## Result - 2022.07.14
++ Function to generate various regression models: `GenRegr_july2022.m`
+
++ Monte Carlo exercise: `MC_main_1007.m` - there are 10 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGPs (7 + 8) – Heteroskedastic errors,
+  + DGPs (9 + 10) – Stochastic Volatility.
+  + Odd DGPs (1 + 3 + 5 + 7 + 9) correspond to Rsquared = 0.4; Even DGPs (2 + 4 + 6 + 8 +20) correspond to Rsquared = 0.8.
+  
++ Summary: 
+```{r, message=FALSE}
+library(R.matlab)
+DGPmat1407 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2307/DGPmat1407.mat")
+DGPmat1407 <- as.data.frame(DGPmat1407)
+names(DGPmat1407) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8", "DGP9", "DGP10")
+beta_mat_1 <- DGPmat1407[1:6,]
+rownames(beta_mat_1) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 50")
+
+beta_mat_2 <- DGPmat1407[7:12,]
+rownames(beta_mat_2) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 100")
+
+beta_mat_3 <- DGPmat2706[13:18,]
+rownames(beta_mat_3) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 150")
+
+epsilon_mat <- DGPmat1407[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)")
+
+SNR_mat <- DGPmat1407[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR")
+
+Rsquared_mat <- DGPmat1407[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared")
+```
+
++ Results:
+  + https://duongtrinh.shinyapps.io/KST-ana5/
+  + https://duongtrinh.shinyapps.io/KST-ana6/
+  
++ Issues: While our goal is inference in coefficients, true $\beta$ varies across DGPs.
+
+## Result - 2022.07.27
++ Function to generate various regression models: `GenRegr_27072022.m`
+
++ Monte Carlo exercise: `MC_main_1007.m` - there are 10 DGPs x 3 pairs (n = 100, p = [50, 100, 150]):
+  + DGPs (1 + 2) – Uncorrelated predictors,
+  + DGPs (3 + 4) – Spatially correlated predictors (rho = 0.4),
+  + DGPs (5 + 6) – Spatially correlated predictors (rho = 0.8),
+  + DGPs (7 + 8) – Heteroskedastic errors,
+  + DGPs (9 + 10) – Stochastic Volatility.
+  + Odd DGPs (1 + 3 + 5 + 7 + 9) correspond to Rsquared = 0.4; Even DGPs (2 + 4 + 6 + 8 +20) correspond to Rsquared = 0.8.
+
++ Summary: 
+```{r, message=FALSE}
+library(R.matlab)
+DGPmat2707 <- readMat("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/Nsim500nsave2000nburn100_2307/DGPmat2707.mat")
+DGPmat2707 <- as.data.frame(DGPmat2707)
+names(DGPmat2707) <- c("DGP1", "DGP2", "DGP3", "DGP4", "DGP5", "DGP6", "DGP7" ,"DGP8", "DGP9", "DGP10")
+beta_mat_1 <- DGPmat2707[1:6,]
+rownames(beta_mat_1) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_1, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 50")
+
+beta_mat_2 <- DGPmat2707[7:12,]
+rownames(beta_mat_2) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_2, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 100")
+
+beta_mat_3 <- DGPmat2707[13:18,]
+rownames(beta_mat_3) <- c("$\\beta_1$", "$\\beta_2$", "$\\beta_3$", "$\\beta_4$", "$\\beta_5$", "$\\beta_6$")
+library(knitr)
+knitr::kable(beta_mat_3, digits = 3, align = "cc", caption = "Beta_true :n = 100, p = 150")
+
+epsilon_mat <- DGPmat2707[19:21,]
+rownames(epsilon_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(epsilon_mat, digits = 3, align = "cc", caption = "var(Epsilon)")
+
+SNR_mat <- DGPmat2707[22:24,]
+rownames(SNR_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(SNR_mat, digits = 3, align = "cc", caption = "SNR")
+
+Rsquared_mat <- DGPmat2707[25:27,]
+rownames(Rsquared_mat) <- c("n = 100, p = 50", "n = 100, p = 100", "n = 100, p = 150")
+library(knitr)
+knitr::kable(Rsquared_mat, digits = 3, align = "cc", caption = "Rsquared")
+```
+
++ Results:
+  + https://duongtrinh.shinyapps.io/KST-ana7/
+
+## More thoughts
+
++ About the Signal-to-Noise Ratio (SNR):
+
+Formula 1:
+
+$$
+ \frac{R^2_{pop}}{1-R^2_{pop}} = SNR = \frac{\left \| \Sigma^{1/2}\beta\right \|^2}{\sigma^2} = \frac{\beta' \Sigma \beta}{\sigma^2}
+$$
+
+Formula 2:
+
+$$
+SNR = \frac{var(X\beta)}{\sigma^2}
+$$
+
+Formula 3:
+
+$$
+SNR = \frac{\beta'X'X\beta}{(n-1)\sigma^2}
+$$
+
+```{r}
+# library(pracma) # for a (non-symmetric) Toeplitz matrix
+GenRegr <- function(n,p,options) {
+  # Generate predictors x
+  if (options.corr == 0) {# Uncorrelated predictors
+    C <-  diag(rep(1,p))
+    x <-  matrix(rnorm(n*p),n,p)%*%chol(C)
+  }
+  else if (options.corr == 1) {# Spatially ncorrelated predictors
+    C <-  toeplitz(options.rho^(0:(p-1)))
+    x <-  matrix(rnorm(n*p),n,p)%*%chol(C)
+  }
+  else {
+    print('Wrong choice of options.corr')
+  }
+  
+  x <- data.matrix(sapply(data.frame(x), function(x) {(x-mean(x))/sd(x)})) # Standardize x
+  
+  # Generate coefficients
+  beta <- rep(0,p)
+  beta[1:6] <- c(1.5,-1.5,2,-2,2.5,-2.5)
+  
+  if (options.corr == 0) {
+    signal_y <- sum(beta^2)
+  } 
+  else if (options.corr == 1) {
+    signal_y <- sum((chol(C)%*%beta)^2)
+  }
+  
+  c <- signal_y*((1-options.R2)/options.R2) # mean(sigmasq) is c to obtain desirable options.R2 (or SNR)
+  
+  # Generate epsilon
+  if (options.epsilon == 0) { # iid error
+    sigmasq <- c
+  } 
+  else if (options.epsilon == 1) {
+    temp = (x%*%beta)
+    sigmasq = c*temp/mean(temp)
+  }
+  
+  epsilon = sqrt(sigmasq) * rnorm(n)
+  
+  # Generate y
+  y = x%*%beta + epsilon
+  
+  return(list(y = y, x = x, beta = beta, C = C, sigmasq = sigmasq))
+}
+```
+
+```{r, message=FALSE, fig.align='center',fig.cap="Signal-to-Noise Ratio over 100 simulations"}
+set.seed(2907)
+n = 100
+p = 50
+options.corr = 1
+options.R2 = 0.8 # SNR = 4
+options.epsilon = 0
+options.rho = 0.4
+
+df <- GenRegr(n, p, options)
+
+y <- df$y
+X <- df$x
+beta_true <-  df$beta
+C <- df$C
+sigmasq <- df$sigmasq
+
+# library(GGally)
+# ggcorr(X, palette = "RdBu", label = FALSE)
+# 
+# library(ggcorrplot)
+# corr <- round(cor(X), 1)
+# ggcorrplot(corr, hc.order = TRUE, outline.col = "white")
+# ggcorrplot(C, hc.order = TRUE, outline.col = "white")
+
+
+Nsim = 100
+SNR_vec1 <- rep(NA,Nsim)
+SNR_vec2 <- rep(NA,Nsim)
+SNR_vec3 <- rep(NA,Nsim)
+
+for (sim in 1 : Nsim) 
+{
+  df <- GenRegr(n, p, options)
+  set.seed(sim)
+  y <- df$y
+  X <- df$x
+  beta_true <-  df$beta
+  C <- df$C
+  SNR_vec1[sim] <-  t(beta_true)%*%C%*%beta_true/sigmasq #sum((chol(C)%*%beta_true)^2)
+  SNR_vec2[sim] <- var(X%*%beta_true)/sigmasq
+  SNR_vec3[sim] <- t(beta_true)%*%t(X)%*%X%*%beta_true/(n-1)/sigmasq
+}
+
+# SNR_vec1
+# SNR_vec2
+# SNR_vec3
+# SNR_vec2 == SNR_vec3
+# SNR_vec1
+# mean(SNR_vec2)
+
+library(tidyverse)
+df <- data.frame(sim = 1:Nsim,SNR_vec1,SNR_vec2,SNR_vec3) 
+df_long <- gather(df, formu, value, -c("sim"))
+
+ggplot(df_long, aes(x = sim, y = value, group = formu)) +
+  geom_line(aes(color = formu), size = 1) +
+  geom_hline(yintercept = mean(SNR_vec2), col = 4)
+
+```
+
+
+**Theorem**
+
+If $\beta$ is a vector and $X$ is a random vector with mean $\mu$ and variance $\Sigma$ then
+
+$$
+\mathbbm E(\beta^TX) = \beta^T\mu \quad \text{and} \quad \mathbbm V(\beta^TX) = \beta^T\Sigma\beta 
+$$
+  
+If $B$ is a matrix then
+
+$$
+\mathbbm E(BX) = B\mu \quad \text{and} \quad \mathbbm V(BX) = B\Sigma ^TB 
+$$
+
++ Choice of priors (and hyper-parameters) 
+  + https://duongtrinh.shinyapps.io/KST-priors/
+
+# Bayesian Linear Regression 
+## R function
+```{r, message=FALSE}
+library("matlab")
+library("MCMCpack")
+BayesRegrR <- function(y, X, nsave = 10000, nburn = 1000) {
+  k <- ncol(X)
+  n <- nrow(X)
+  
+  # =====| Initialize parameters
+  B0 <- 1000*eye(k)
+  b0 = zeros(k,1)
+  alpha0 = 0.002
+  delta0 = 0.002
+  
+  sigmasq = 1
+  
+  # =====| Storage space for Gibbs draws
+  beta_draws = zeros(k,nsave)
+  sigmasq_draws = zeros(1,nsave)
+  
+  #==========================================================================
+  #====================| GIBBS ITERATIONS START HERE |=======================
+  for (iter in 1:(nburn + nsave)) {
+    #=====|Draw beta
+    Bn <- solve(t(X)%*%X/sigmasq + solve(B0))
+    bn <- Bn%*%(t(X)%*%y/sigmasq + solve(B0)%*%b0)
+    H <- chol(Bn)
+    beta <- bn + t(H)%*%matrix(rnorm(k),k,1)
+    
+    #=====|Draw sigma^2
+    resid <- y - X%*%beta
+    alphan <- alpha0 + n
+    deltan <- delta0 + t(resid)%*%resid
+    sigmasq <- rinvgamma(1, shape = alphan/2, scale = deltan/2)
+    
+    #=====|Save draws
+    if (iter > nburn) {
+      beta_draws[,iter-nburn] <- beta
+      sigmasq_draws[,iter-nburn] <- sigmasq
+    }
+  }
+  return(list(betadraws=beta_draws,sigmasqdraws=sigmasq_draws))
+}
+```
+
+```{r, message=FALSE}
+# library("rstanarm")
+```
+
+
+## Rcpp function
+```{r, message=FALSE}
+library(Rcpp)
+library(RcppArmadillo)
+sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/CPPDuong/BayesRegr.cpp")
+
+# The following codes are written in Cpp:
+
+# //[[Rcpp::depends(RcppArmadillo)]]
+# #include <RcppArmadillo.h>
+# using namespace Rcpp;
+# using namespace arma;
+# 
+# #include "BayesRegr.h"
+# 
+# //[[Rcpp::export]]
+# Rcpp::List BayesRegr(
+#     const arma::colvec& y, // an lvalue reference to a colvec object (the ampersand & means "lvalue reference to")
+#     const arma::mat& X,
+#     int nsave,
+#     int nburn)
+# {
+#     //--------------------------------------------------------------
+#     //
+#     arma::uword n = X.n_rows, p = X.n_cols;
+#     // Initialize parameters
+#     arma::mat B0 = 1000*eye(p,p);
+#     arma::mat b0 = zeros(p,1);
+#     double alpha0 { 0.002 }, delta0 { 0.002 };
+#     arma::colvec Q = B0.diag();
+#     
+#     arma::colvec beta = zeros(p,1);
+#     double sigmasq = 1;
+#     
+#     // Process
+#     /*arma::mat Bn, bn, H, beta;*/
+#     arma::colvec resid;
+#     double alphan, deltan;
+#     
+#     // Return data structures
+#     arma::mat beta_draws = zeros(p,nsave);
+#     arma::mat sigmasq_draws = zeros(1,nsave);
+#     
+#     //-----------------GIBBS ITERATIONS START HERE--------------------
+#     for (arma::uword iter = 0; iter < (nburn + nsave); iter ++) {
+#         
+#         // Draw beta
+#         /*
+#         Bn = inv(X.t()*X/sigmasq + inv(B0));
+#         bn = Bn*X.t()*y/sigmasq + solve(B0,b0);
+#         H = chol(Bn);
+#         beta = bn + H.t()*randn(p,1);
+#         */
+#         beta = randn_gibbs(y, X, Q, sigmasq, n, p);
+#         
+#         // Draw sigmasq
+#         resid = y - X*beta;
+#         alphan = alpha0 + n;
+#         deltan = delta0 + arma::as_scalar(resid.t()*resid);
+#         sigmasq = 1/R::rgamma(alphan/2,2/deltan);
+#         
+#         // Save draws
+#         if (iter > nburn - 1) {
+#             beta_draws.col(iter-nburn) = beta;
+#             sigmasq_draws.col(iter-nburn) = sigmasq;
+#         }
+#     }
+#     return Rcpp::List::create(
+#         Rcpp::Named("betadraws") = beta_draws,
+#         Rcpp::Named("sigmasqdraws") = sigmasq_draws);
+# }
+# 
+# 
+# //[[Rcpp::export]]
+# arma::mat randn_gibbs(
+#     arma::colvec y,
+#     arma::mat X,
+#     arma::colvec lambda,
+#     double sigmasq,
+#     double n,
+#     double p)
+# {
+#     // Transformation
+#     y = y/sqrt(sigmasq);
+#     X = X/sqrt(sigmasq);
+#     
+#     // Sample Gausian posterior efficiently (Rue, 2001)
+#     arma::mat Q_star = X.t()*X;
+#     arma::mat Dinv = diagmat(1/lambda);
+#     arma::mat L = chol((Q_star + Dinv),"lower");
+#     arma::colvec v = solve(L,(y.t()*X).t());
+#     arma::colvec mu = solve(L.t(),v);
+#     arma::colvec u = solve(L.t(),randn<colvec>(p));
+#     arma::colvec Beta = mu + u;
+#     
+#     return std::move(Beta); //call 'std::move' explicitly to avoid copying local variable Beta?
+# }
+```
+
+## Illustrations
+```{r, message=FALSE, results='hide'}
+# Data Generating Process ====
+set.seed(2107)
+n = 100
+k = 3
+X = cbind(rep(1,n),rnorm(n,0,1),rbinom(n,2,0.5))
+sigmasq_true <-  4
+beta_true <- c(1, -1.5, 2)
+
+y <- X%*%beta_true + sqrt(sigmasq_true)*rnorm(n,0,1)
+
+# Comparison ====
+library(tictoc)
+tic()
+resR <- BayesRegrR(y,X,nsave=10000,nburn=1000)
+timeBayesRegrR <- toc()
+
+# tic()
+# resBayesRegrRstan <- stan_glm(y~X, data = data.frame(y,X))
+# timeBayesRegrRstan <- toc()
+
+tic()
+resRcpp <- BayesRegr(y,X,nsave=10000,nburn=1000)
+timeBayesRegrRcpp <- toc()
+```
+
+```{r}
+## Timing ====
+timing <- data.frame(timeBayesRegrR$toc-timeBayesRegrR$tic,timeBayesRegrRcpp$toc-timeBayesRegrRcpp$tic)
+
+names(timing) <- c("BayesRegrR","BayesRegrRcpp")
+
+library(knitr)
+knitr::kable(timing, align = "cc", caption = "Computation Time (seconds)")
+
+# library(bench)
+# bench::mark(BayesRegrR = BayesRegrR(y,X,nsave=10000,nburn=1000), BayesRegrRcpp = BayesRegr(y,X,nsave=10000,nburn=1000))
+
+# library(microbenchmark)
+# microbenchmark(BayesRegrR = BayesRegrR(y,X,nsave=10000,nburn=1000), BayesRegrRcpp = BayesRegr(y,X,nsave=10000,nburn=1000))
+```
+
+```{r}
+## Results ====
+beta_meanRcpp <- rowMeans(resRcpp$betadraws)
+beta_medianRcpp <- sapply(as.data.frame(t(resRcpp$betadraws)), median)
+sigmasq_meanRcpp <- mean(resRcpp$sigmasqdraws)
+sigmasq_medianRcpp <- median(resRcpp$sigmasqdraws)
+
+
+beta_meanR <- rowMeans(resR$betadraws)
+beta_medianR <- sapply(as.data.frame(t(resR$betadraws)), median)
+sigmasq_meanR <- mean(resR$sigmasqdraws)
+sigmasq_medianR <- median(resR$sigmasqdraws)
+
+beta_OLS <-  as.vector(solve(t(X)%*%X)%*%(t(X)%*%y))
+
+library(knitr)
+knitr::kable(data.frame(beta_true, beta_OLS, beta_meanR, beta_meanRcpp, beta_medianR, beta_medianRcpp), row.names = FALSE)
+
+knitr::kable(data.frame(sigmasq_true, sigmasq_meanR, sigmasq_meanRcpp, sigmasq_medianR, sigmasq_medianRcpp))
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+library(purrr)
+library(ggplot2)
+library(gridExtra)
+
+names_beta <- map_chr(1:nrow(resRcpp$betadraws),~paste0("b",.x))
+
+df_beta <- data.frame(t(resRcpp$betadraws)) %>%
+  `names<-`(.,names_beta) %>% 
+  mutate(nsave = 1:ncol(resRcpp$betadraws)) %>% 
+  gather(., beta, value, -c("nsave")) %>% 
+  mutate(beta = factor(beta, level = names_beta))
+
+df_para <- data.frame(t(resRcpp$betadraws)) %>%
+  `names<-`(.,names_beta) %>% 
+  mutate(sigsq = t(resRcpp$sigmasqdraws), nsave = 1:ncol(resRcpp$betadraws))
+
+para_true_mat <- data.frame(t(beta_true),sigmasq_true) %>% `names<-`(.,c(names_beta,"sigsq"))
+```
+
+```{r}
+plot.trace <- function(para) {
+  ggplot(df_para, aes(x = nsave, y = df_para[,para])) +
+    geom_line(col = 4) +
+    geom_hline(aes(yintercept = mean(df_para[,para])), linetype = 2) +
+    geom_hline(aes(yintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+    ggtitle(paste0("Trace plot for ", para)) +
+    ylab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.trace <- lapply(c(names_beta, "sigsq"), plot.trace)
+
+do.call(grid.arrange,p.trace)
+```
+
+```{r}
+plot.density <- function(para) {
+  ggplot(df_para, aes(x = df_para[,para])) +
+    geom_density(col = 4) +
+    geom_vline(aes(xintercept = mean(df_para[,para])), linetype = 2) +
+    geom_vline(aes(xintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+    ggtitle(paste0("Density plot for ", para)) +
+    xlab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.density <- lapply(c(names_beta, "sigsq"), plot.density)
+
+do.call(grid.arrange, p.density)
+```
+
+```{r}
+#' # Calculate the autocorrelation of a simple vector
+#' ac(cumsum(rnorm(10))/10, nLags=4)
+ac <- function(x, nLags) {
+  X <- matrix(NA, ncol=nLags, nrow=length(x))
+  X[,1] <- x
+  for (i in 2:nLags) {
+    X[,i] <- c(rep(NA, i-1), x[1:(length(x)-i+1)])
+  }
+  X <- data.frame(Lag=1:nLags, Autocorrelation=cor(X, use="pairwise.complete.obs")[,1])
+  return(X)
+}
+
+plot.ACF <- function(para){
+  ggplot(ac(df_para[,para], nLags = 100), aes(x = Lag, y = Autocorrelation)) +
+  geom_bar(stat="identity", position="identity", fill = 4) + ylim(-1, 1) +
+  ggtitle(paste0("ACF plot for ", para)) +
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+p.ACF <- lapply(c(names_beta, "sigsq"), plot.ACF)
+
+do.call(grid.arrange, p.ACF)
+```
+
+```{r}
+#' # Calculate the running mean of a simple vector
+#' runmean(1:10)
+runmean <- function(x) {
+  cumsum(x)/c(1:length(x))
+}
+
+df_para2 <- df_para %>% sapply(.,runmean) %>% as.data.frame(.) %>% mutate(., nsave = 1:nrow(df_para))
+
+plot.running <- function(para){
+  ggplot(df_para2, aes(x = nsave, y = df_para2[,para])) +
+  geom_line(col = 4) +
+  geom_hline(aes(yintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+  geom_hline(aes(yintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+  ggtitle(paste0("Plot for ", para)) +
+  ylab("Running mean") + 
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+p.running <- lapply(c(names_beta, "sigsq"), plot.running)
+
+do.call(grid.arrange, p.running) 
+```
+
+```{r}
+df_beta2 <- df_beta %>% group_by(beta) %>% 
+  summarise(ub = quantile(value,0.975),
+            lb = quantile(value,0.025),
+            UB = quantile(value,0.95),
+            LB = quantile(value,0.05),
+            m = median(value)) %>% 
+  mutate(true = beta_true)
+
+ggplot(df_beta2, aes(x = beta, y = m)) +
+  geom_point(size = 1, col = "blue") +
+  geom_point(aes(x = beta, y = true), size = 1, col = "red", shape = 2) +
+  geom_linerange(aes(ymin = LB, ymax = UB), size=1) +
+  geom_linerange(aes(ymin = lb, ymax = ub), size=0.3) +
+  xlab("HPD") +
+  ylab("Parameters") +
+  ggtitle("Caterpillar plot") +
+  coord_flip() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+df_para_co <- data.frame(rbind(t(resR$betadraws),t(resRcpp$betadraws))) %>%
+  `names<-`(.,names_beta) %>% 
+  mutate(sigsq = rbind(t(resR$sigmasqdraws),t(resRcpp$sigmasqdraws)), 
+         nsave = c(1:ncol(resR$betadraws), 1:ncol(resRcpp$betadraws)), 
+         lang = c(rep("R",ncol(resR$betadraws)), rep("Rcpp",ncol(resRcpp$betadraws)))) %>% 
+  mutate(.,lang = factor(lang, level = c("R","Rcpp")))
+```
+
+```{r}
+plot.trace.co <- function(para) {
+  ggplot(df_para_co, aes(x = nsave, y = df_para_co[,para])) +
+    geom_line(aes(col = lang), alpha = 0.6) +
+    geom_hline(aes(yintercept = mean(df_para_co[,para]), col = lang), linetype = 2, alpha = 0.8) +
+    ggtitle(paste0("Trace plot for ", para)) +
+    ylab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.trace.co <- lapply(c(names_beta, "sigsq"), plot.trace.co)
+
+do.call(grid.arrange,p.trace.co)
+```
+
+```{r}
+plot.density.co <- function(para) {
+  ggplot(df_para_co, aes(x = df_para_co[,para], group = lang)) +
+    geom_density(aes(fill = lang), alpha = 0.4) +
+    geom_vline(aes(xintercept = mean(df_para_co[,para]), col = lang), linetype = 2, alpha = 0.8) +
+    ggtitle(paste0("Density plot for ", para)) +
+    xlab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.density.co <- lapply(c(names_beta, "sigsq"), plot.density.co)
+
+do.call(grid.arrange, p.density.co)
+```
+
+
+```{r,message=FALSE}
+# library(bayesplot)
+# posterior <- as.matrix(resBayesRegrRstan)
+# mcmc_areas(posterior, prob = 0.8) + 
+#   ggtitle("Posterior distributions",
+#                       "with medians and 80% intervals")
+# 
+# color_scheme_set("red")
+# ppc_dens_overlay(y = resBayesRegrRstan$y,
+#                  yrep = posterior_predict(resBayesRegrRstan, draws = 50))
+```
+
+
+
+# Bayesian Linear Regression with Shrinkage Priors
+## R function
+
++ Paper: @makalic2016high - [High-Dimensional Bayesian Regularized Regression with the `bayesreg` Package](https://arxiv.org/pdf/1611.06649.pdf)
+
++ Reference manual: [Package `bayesreg`](https://cran.r-project.org/web/packages/bayesreg/bayesreg.pdf)
+
+```{r, message=FALSE}
+# install.packages("bayesreg", dependencies = TRUE)
+library(bayesreg)
+# To call function `bayesreg()`
+```
+
+## Rcpp function
+Based on @korobilis2022bayesian - [Bayesian Approaches to Shrinkage and Sparse Estimation](https://www.nowpublishers.com/article/Details/ECO-041)
+```{r}
+library(Rcpp)
+library(RcppArmadillo)
+sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/CPPDuong/BayesRegrSP.cpp")
+# To call function `BayesRegrSP()`
+```
+
+
+## Illustrations
+```{r}
+# library(pracma) # for a (non-symmetric) Toeplitz matrix
+GenRegr <- function(n,p,options) {
+  # Generate predictors x
+  if (options.corr == 0) {# Uncorrelated predictors
+    x = matrix(rnorm(n*p),n,p)
+  }
+  else if (options.corr == 1) {# Spatially ncorrelated predictors
+    C = toeplitz(options.rho^(0:(p-1)))
+    x = matrix(rnorm(n*p),n,p)%*%chol(C)
+  }
+  else {
+    print('Wrong choice of options.corr')
+  }
+  
+  x <- data.matrix(sapply(data.frame(x), function(x) {(x-mean(x))/sd(x)})) # Standardize x
+  
+  # Generate coefficients
+  beta <- rep(0,p)
+  beta[1:6] <- c(1.5,-1.5,2,-2,2.5,-2.5)
+  
+  if (options.corr == 0) {
+    signal_y <- sum(beta^2)
+  } 
+  else if (options.corr == 1) {
+    signal_y <- sum((chol(C)%*%beta)^2)
+  }
+  
+  c <- signal_y*((1-options.R2)/options.R2) # mean(sigmasq) is c to obtain desirable options.R2 (or SNR)
+  
+  # Generate epsilon
+  if (options.epsilon == 0) { # iid error
+    sigmasq <- c
+  } 
+  else if (options.epsilon == 1) {
+    temp = (x%*%beta)
+    sigmasq = c*temp/mean(temp)
+  }
+  
+  epsilon = sqrt(sigmasq) * rnorm(n)
+  
+  # Generate y
+  y = x%*%beta + epsilon
+  
+  return(list(y = y, x = x, beta = beta, sigmasq = sigmasq))
+}
+```
+
+
+```{r, results='hide'}
+# Data Generating Process ====
+## DGP 2
+set.seed(2907)
+n = 100
+p = 50
+options.corr = 0
+options.R2 = 0.8
+options.epsilon = 0
+options.rho = NA
+
+df <- GenRegr(n, p, options)
+
+y <- df$y
+X <- df$x
+beta_true <-  df$beta
+sigmasq_true <- df$sigmasq
+
+# Comparison ====
+library(tictoc)
+# tic()
+# resR_ridge <- bayesreg(y~X,data=df,model="normal",prior="ridge",burnin=1000,n.samples=11000)
+# t3 <- toc()
+# 
+# tic()
+# resR_ls <- bayesreg(y~X,data=df,model="normal",prior="lasso",burnin=1000,n.samples=11000)
+# t4 <- toc()
+# 
+tic()
+resRcpp_st <- BayesRegrSP(y,X,nsave=10000,nburn =5000,prior="student-t")
+t1 <- toc()
+
+# tic()
+# resRcpp_ls <- BayesRegrSP(y,X,nsave=10000,nburn =1000,prior="lasso")
+# t2 <- toc()
+
+# tic()
+# resRcpp <- BayesRegr(y,X,nsave=10000,nburn =1000)
+# t5 <- toc()
+```
+
+```{r}
+## Timing ====
+# timing <- data.frame(t3$toc-t3$tic,t4$toc-t4$tic,t1$toc-t1$tic,t2$toc-t2$tic, t5$toc-t5$tic)
+# 
+# names(timing) <- c("BayesR_ridge","BayesR_lasso","BayesRcpp_studt","BayesRcpp_lasso", "BayesRcpp")
+# 
+# library(knitr)
+# knitr::kable(timing, align = "cc", caption = "Computation Time (seconds)")
+```
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(purrr)
+library(ggplot2)
+library(gridExtra)
+
+resRcpp <- resRcpp_st
+
+names_beta <- map_chr(1:nrow(resRcpp$betadraws),~paste0("b",.x))
+
+df_beta <- data.frame(t(resRcpp$betadraws)) %>%
+  `names<-`(.,names_beta) %>% 
+  mutate(nsave = 1:ncol(resRcpp$betadraws)) %>% 
+  gather(., beta, value, -c("nsave")) %>% 
+  mutate(beta = factor(beta, level = names_beta))
+
+df_para <- data.frame(t(resRcpp$betadraws)) %>%
+  `names<-`(.,names_beta) %>% 
+  mutate(sigsq = t(resRcpp$sigmasqdraws), nsave = 1:ncol(resRcpp$betadraws))
+
+para_true_mat <- data.frame(t(beta_true),sigmasq_true) %>% `names<-`(.,c(names_beta,"sigsq"))
+
+```
+
+```{r}
+plot.trace <- function(para) {
+  ggplot(df_para, aes(x = nsave, y = df_para[,para])) +
+    geom_line(col = 4) +
+    geom_hline(aes(yintercept = mean(df_para[,para])), linetype = 2) +
+    geom_hline(aes(yintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+    ggtitle(paste0("Trace plot for ", para)) +
+    ylab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.trace <- lapply(names_beta[1:6], plot.trace)
+
+do.call(grid.arrange,p.trace)
+
+plot.trace("sigsq")
+```
+
+```{r}
+plot.density <- function(para) {
+  ggplot(df_para, aes(x = df_para[,para])) +
+    geom_density(col = 4) +
+    geom_vline(aes(xintercept = mean(df_para[,para])), linetype = 2) +
+    geom_vline(aes(xintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+    ggtitle(paste0("Density plot for ", para)) +
+    xlab(para) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+p.density <- lapply(names_beta[1:6], plot.density)
+
+do.call(grid.arrange, p.density)
+
+plot.density("sigsq")
+```
+
+```{r}
+#' # Calculate the autocorrelation of a simple vector
+#' ac(cumsum(rnorm(10))/10, nLags=4)
+ac <- function(x, nLags) {
+  X <- matrix(NA, ncol=nLags, nrow=length(x))
+  X[,1] <- x
+  for (i in 2:nLags) {
+    X[,i] <- c(rep(NA, i-1), x[1:(length(x)-i+1)])
+  }
+  X <- data.frame(Lag=1:nLags, Autocorrelation=cor(X, use="pairwise.complete.obs")[,1])
+  return(X)
+}
+
+plot.ACF <- function(para){
+  ggplot(ac(df_para[,para], nLags = 100), aes(x = Lag, y = Autocorrelation)) +
+  geom_bar(stat="identity", position="identity", fill = 4) + ylim(-1, 1) +
+  ggtitle(paste0("ACF plot for ", para)) +
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+p.ACF <- lapply(names_beta[1:6], plot.ACF)
+
+do.call(grid.arrange, p.ACF)
+
+plot.ACF("sigsq")
+```
+
+```{r}
+#' # Calculate the running mean of a simple vector
+#' runmean(1:10)
+runmean <- function(x) {
+  cumsum(x)/c(1:length(x))
+}
+
+df_para2 <- df_para %>% sapply(.,runmean) %>% as.data.frame(.) %>% mutate(., nsave = 1:nrow(df_para))
+
+plot.running <- function(para){
+  ggplot(df_para2, aes(x = nsave, y = df_para2[,para])) +
+  geom_line(col = 4) +
+  ggtitle(paste0("Plot for ", para)) +
+  geom_hline(aes(yintercept = mean(df_para[,para])), linetype = 2) +
+  geom_hline(aes(yintercept = para_true_mat[,para]), linetype = 2, col = "red") +
+  ylab("Running mean") + 
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+p.running <- lapply(names_beta[1:6], plot.running)
+
+do.call(grid.arrange, p.running) 
+
+plot.running("sigsq")
+```
+
+```{r}
+df_beta2 <- df_beta %>% group_by(beta) %>% 
+  summarise(ub = quantile(value,0.975),
+            lb = quantile(value,0.025),
+            UB = quantile(value,0.95),
+            LB = quantile(value,0.05),
+            m = median(value)) %>% 
+  mutate(true = beta_true)
+
+ggplot(df_beta2, aes(x = beta, y = m)) +
+  geom_point(size = 1, col = "blue") +
+  geom_point(aes(x = beta, y = true), size = 1, col = "red", shape = 2) +
+  geom_linerange(aes(ymin = LB, ymax = UB), size=1) +
+  geom_linerange(aes(ymin = lb, ymax = ub), size=0.3) +
+  xlab("HPD") +
+  ylab("Parameters") +
+  ggtitle("Caterpillar plot") +
+  coord_flip() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+df_beta2 <- df_beta %>% mutate(cl = dplyr::case_when(beta %in% c("b1","b2","b3","b4","b5","b6") ~ "signal", TRUE ~ "noise"))
+df_beta2$cl <- factor(df_beta2$cl, levels = c("signal", "noise"))
+
+ggplot(df_beta2, aes(x = value)) +
+   geom_density(aes(col = beta, fill = cl), alpha = 0.4) +
+   scale_fill_manual(values = c("blue","grey")) +
+   scale_color_grey(start=0.8, end=0.2) +
+  guides(color = FALSE) +
+  ggtitle("Density plot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "bottom") +
+  labs(fill = "beta")
+  
+  
+```
+
+
+# Reference
+
