@@ -401,7 +401,7 @@ BayesRegrR <- function(y, X, nsave = 10000, nburn = 1000) {
 ```{r, message=FALSE}
 library(Rcpp)
 library(RcppArmadillo)
-sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/CPPDuong/BayesRegr.cpp")
+sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/BIDuong_ShrinkagePrior/cpp functions/BayesRegr.cpp")
 
 # The following codes are written in Cpp:
 
@@ -755,7 +755,7 @@ Based on @korobilis2022bayesian - [Bayesian Approaches to Shrinkage and Sparse E
 ```{r}
 library(Rcpp)
 library(RcppArmadillo)
-sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/CPPDuong/BayesRegrSP.cpp")
+sourceCpp("/Users/duongtrinh/Dropbox/FIELDS/Data Science/R_Data Science/R Practice/BIDuong_ShrinkagePrior/cpp functions/BayesRegrSP.cpp")
 # To call function `BayesRegrSP()`
 ```
 
